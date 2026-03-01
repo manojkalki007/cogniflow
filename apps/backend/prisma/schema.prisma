@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  OPERATOR
+  ANALYST
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+}
+
+enum CallStatus {
+  QUEUED
+  RINGING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  VOICEMAIL
+}
+
+model Organization {
+  id            String        @id @default(uuid())
+  name          String
+  createdAt     DateTime      @default(now())
+  users         User[]
+  agents        Agent[]
+  campaigns     Campaign[]
+  contacts      Contact[]
+  apiKeys       ApiKey[]
+  integrations  Integration[]
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  passwordHash   String
+  name           String
+  role           UserRole
+  isEmailVerified Boolean @default(false)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime @default(now())
+}
+
+model Agent {
+  id                 String   @id @default(uuid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id])
+  name               String
+  template           String?
+  systemPrompt       String
+  greetingMessage    String
+  llmProvider        String
+  sttProvider        String
+  ttsProvider        String
+  voiceSpeed         Float    @default(1)
+  voicePitch         Float    @default(1)
+  interruptSensitivity Float @default(0.65)
+  maxCallDurationSec Int      @default(900)
+  voicemailDetection Boolean  @default(true)
+  transferTarget     String?
+  createdAt          DateTime @default(now())
+  campaigns          Campaign[]
+}
+
+model Campaign {
+  id              String   @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  name            String
+  status          CampaignStatus @default(DRAFT)
+  agentId         String
+  agent           Agent @relation(fields: [agentId], references: [id])
+  telephonyNumber String
+  concurrencyLimit Int    @default(10)
+  scheduledAt     DateTime?
+  createdAt       DateTime @default(now())
+  calls           Call[]
+}
+
+model Contact {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  firstName      String
+  lastName       String?
+  phone          String
+  email          String?
+  source         String?
+  createdAt      DateTime @default(now())
+}
+
+model Call {
+  id            String   @id @default(uuid())
+  campaignId    String
+  campaign      Campaign @relation(fields: [campaignId], references: [id])
+  contactId     String?
+  status        CallStatus @default(QUEUED)
+  durationSec   Int?
+  recordingUrl  String?
+  transcript    String?
+  disposition   String?
+  latencyMs     Int?
+  createdAt     DateTime @default(now())
+}
+
+model Integration {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  provider       String
+  configJson     Json
+  enabled        Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
+model ApiKey {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  label          String
+  keyHash        String
+  lastUsedAt     DateTime?
+  createdAt      DateTime @default(now())
+}
